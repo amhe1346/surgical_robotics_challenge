@@ -1,0 +1,101 @@
+To run simulation 
+Terminal One
+source /opt/ros/humble/setup.bash
+source ~/ros_ambf_ws/install/setup.bash
+source ~/venv_src/bin/activate
+cd "/home/amy/Downloads/Special-topics/Surgical robotics ai"
+
+
+
+
+run ./run_env_3D_MED_COMPLEX_LND_420006.sh
+
+
+notes# there are 2 windoes bc when there are two mintors you iwll have different camera views, with just one monitor it shwos the 
+same camera view 
+set visble : false for one 
+
+
+
+to run gui 
+terminal 2 
+python scripts/surgical_robotics_challenge/examples/gui_based_control.py --ecm False
+
+theres two, one for each arm 
+
+
+\
+crtk interface
+open another terminal 
+
+cd "/home/amy/Downloads/Special-topics/Surgical robotics ai/scripts/surgical_robotics_challenge"
+python launch_crtk_interface.py --ecm False --scene True
+
+notes . this is the ros interface,
+can open another teminal to publish the ROS APIs . 
+use eihter the crtk or the gui 
+
+
+apis to run 
+
+# need the crtk command in another terminal 
+
+source /opt/ros/humble/setup.bash
+source ~/ros_ambf_ws/install/setup.bash
+source ~/venv_src/bin/activate
+cd "/home/amy/Downloads/Special-topics/Surgical robotics ai/scripts/surgical_robotics_challenge"
+python examples/crtk_ros_based_control.py
+
+
+
+-----------------------
+
+Keep ROS Humble, the AMBF workspace, and your
+ venv_src environment sourced in each terminal you use. 
+ Don’t run the GUI controller and ROS movement demo on 
+ the same arm at the same time.
+
+
+
+ to run the needle grasps
+ python scripts/surgical_robotics_challenge/examples/task3_init_test.py
+
+
+
+A good way to tackle this is to start with one learned subtask, rather than train an end-to-end suturing policy immediately. I’ll check how this challenge reports task completion and exposes robot/needle state, then map those into an RL environment design.
+
+
+
+
+
+The repo exposes the needed ingredients: arm joint/cartesian state, needle and entry/exit poses, and task-report topics. The existing evaluator can provide task success criteria; I’m checking those next so an RL reward can align with the challenge instead of inventing a surrogate goal.
+
+Read evaluation.py, lines 1 to 280
+
+Read evaluation.py, lines 280 to 620
+
+Read evaluation.py, lines 620 to 814
+
+A practical route is to wrap the simulator as a Gymnasium environment and train a policy for one needle pass first, before attempting the full suturing task. The repo already exposes the robot and scene state you need through the direct Python API; the control examples show how to command it in interface_via_method_api.py.
+
+Make a small environment. Implement reset() to reset the world and place the robot and needle in a randomized starting state. Implement step(action) to send a short arm command, advance the simulation, then return the new observation, reward, and done flag. Use the direct AMBF API initially; putting ROS messages in the training loop adds unnecessary latency.
+
+Start with Task 2. Give the policy one target entry/exit hole pair. For observations, use PSM joint and end-effector pose, jaw angle, needle pose and tip, and the target hole poses. Start with state data rather than camera images; add vision later.
+
+Use bounded continuous actions. For example, command small Cartesian pose changes plus a jaw command. Clamp actions to the robot’s workspace and joint limits. Keep a conventional servo controller underneath the learned policy.
+
+Reward progress toward a real pass. Shape reward around needle-tip alignment with the entry hole, insertion through the entry and matching exit, and low lateral error. Penalize dropping the needle, collisions, excessive motion, and time. Use the challenge evaluator’s success conditions for the terminal success signal; see evaluation.py. Task 3 is a larger step: it expects eight ordered entry/exit insertions across the four hole pairs.
+
+Train and test safely. Start with scripted or teleoperated demonstrations, then try continuous-control RL such as PPO or SAC. Randomize starting poses and needle positions during training, and validate across many resets. Keep it simulation-only until the policy is stable.
+
+The existing task3_init_test.py is useful for preparing a needle grasp, but it moves the needle directly in code; don’t use that scripted needle movement as the learned policy’s success.
+
+Yes, in principle, but π0.7 isn’t a plug-and-play RL controller for this simulator. It’s a pretrained vision-language-action policy; to use it here, you’d need a way to run the model and adapt its observations and actions to AMBF’s PSM robots. It won’t automatically know how to interpret these cameras or issue the commands this simulation expects.
+
+For this repo, a practical route is to first train a smaller policy using the direct Python API:
+
+Observations: robot joint/end-effector state, needle pose, and entry/exit hole poses.
+Actions: small Cartesian changes and jaw commands through the PSM API in psm_arm.py.
+Goal: start with one needle pass and use the challenge checks in evaluation.py to determine success.
+Once that works, you could add camera images and demonstrations, then use a pretrained VLA such as π0.7 as the policy backbone and fine-tune it for this robot and task. The difficult part will be reliable needle grasping and precise contact through the holes, especially when coordinating both arms.
+

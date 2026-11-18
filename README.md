@@ -37,7 +37,7 @@ b. 3D Med Simple Suturing Phantom
 c. Simple Suturing Phantom
 
 ```bash
-./run_env_SIMPLE_LND_420006.sh
+python scripts/surgical_robotics_challenge/examples/gui_based_control.py --ecm False
 ```
 
 d. Asymmetric Pegboard with Wall

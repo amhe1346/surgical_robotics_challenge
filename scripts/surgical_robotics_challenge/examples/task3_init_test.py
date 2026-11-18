@@ -5,7 +5,7 @@ from surgical_robotics_challenge.psm_arm import PSM
 from surgical_robotics_challenge.simulation_manager import SimulationManager
 from surgical_robotics_challenge.kinematics.psmKinematics import ToolType
 
-tool_id = ToolType.Default
+tool_id = ToolType.LND_SI
 
 simulation_manager = SimulationManager('task_3_setup_test')
 time.sleep(0.5)
